@@ -27,7 +27,8 @@ class Window(QMainWindow):
 
         self.motorStatLabels = [self.ui.labelMotorDesignation, self.ui.labelImpulse, self.ui.labelDeliveredISP, self.ui.labelBurnTime,  self.ui.labelVolumeLoading,
                                 self.ui.labelAveragePressure, self.ui.labelPeakPressure, self.ui.labelInitialKN, self.ui.labelPeakKN, self.ui.labelIdealThrustCoefficient,
-                                self.ui.labelPropellantMass, self.ui.labelPropellantDimensions, self.ui.labelPortThroatRatio, self.ui.labelPeakMassFlux, self.ui.labelDeliveredThrustCoefficient
+                                self.ui.labelPropellantMass, self.ui.labelPropellantDimensions, self.ui.labelPortThroatRatio, self.ui.labelPeakMassFlux, self.ui.labelDeliveredThrustCoefficient,
+                                self.ui.labelPeakThrust, self.ui.labelPeakExitVelocity, self.ui.labelPeakExitMachNumber
                                ]
 
         self.app.fileManager.fileNameChanged.connect(self.updateWindowTitle)
@@ -299,12 +300,14 @@ class Window(QMainWindow):
         self.ui.labelDeliveredISP.setText(self.formatMotorStat(simResult.getISP(), 's'))
         self.ui.labelBurnTime.setText(self.formatMotorStat(simResult.getBurnTime(), 's'))
         self.ui.labelVolumeLoading.setText('{:.2f}%'.format(simResult.getVolumeLoading()))
+        self.ui.labelPeakThrust.setText(self.formatMotorStat(simResult.getPeakForce(), 'N'))
 
         self.ui.labelAveragePressure.setText(self.formatMotorStat(simResult.getAveragePressure(), 'Pa'))
         self.ui.labelPeakPressure.setText(self.formatMotorStat(simResult.getMaxPressure(), 'Pa'))
         self.ui.labelInitialKN.setText(self.formatMotorStat(simResult.getInitialKN(), ''))
         self.ui.labelPeakKN.setText(self.formatMotorStat(simResult.getPeakKN(), ''))
         self.ui.labelIdealThrustCoefficient.setText(self.formatMotorStat(simResult.getIdealThrustCoefficient(), ''))
+        self.ui.labelPeakExitVelocity.setText(self.formatMotorStat(simResult.getPeakExitVelocity(), 'm/s'))
 
         self.ui.labelPropellantMass.setText(self.formatMotorStat(simResult.getPropellantMass(), 'kg'))
         propellantDimensionString = '⌀ {} x {}'.format(
@@ -324,6 +327,7 @@ class Window(QMainWindow):
             self.ui.labelPortThroatRatio.setText('-')
             self.ui.labelPeakMassFlux.setText('-')
         self.ui.labelDeliveredThrustCoefficient.setText(self.formatMotorStat(simResult.getAdjustedThrustCoefficient(), ''))
+        self.ui.labelPeakExitMachNumber.setText(self.formatMotorStat(simResult.getPeakExitMachNumber(), ''))
 
     def getQuickResults(self, motor):
         thread = lambda: self.showQuickResults(motor.getQuickResults())

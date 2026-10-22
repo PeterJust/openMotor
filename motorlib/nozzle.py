@@ -100,6 +100,16 @@ class Nozzle(PropertyCollection):
         efficiency = self.getProperty('efficiency')
         return divLoss * throatLoss * efficiency * (skinLoss * thrustCoeffIdeal + (1 - skinLoss))
 
+    def calcExitVelocity(self, thrust, ambPres, exitPres, massFlux):
+        """Calculate the exit velocity based on the thrust, accounting for thrust loss or gain due to 
+        under- or overexpanded flow."""
+        return (thrust - (exitPres - ambPres) * self.getExitArea()) / massFlux
+
+    def calcExitMachNumber(self, chamberPres, exitPres, gamma):
+        """Calculates the Mach number at the nozzle exit given the chamber pressure, exit pressure, 
+        and isentropic exponent. -- suboptimal solution, better calculate in harmony with the rest of the program!"""
+        return math.sqrt((2 / (gamma - 1) * ((chamberPres / exitPres) ** ((gamma - 1) / gamma) - 1)))
+
     def getGeometryErrors(self):
         """Returns a list containing any errors with the nozzle's properties."""
         errors = []

@@ -186,6 +186,12 @@ class Motor:
 
         return max(M, 0)
 
+    def calcHeatFlow(self, massFlow, molarMass, gasConstant, gamma, T):
+        """Calculates the heat flow based on mass flow, gas properties, and the combustion temperature. Ambient
+        temperature is assumed to be 293.15 K."""
+        cP = gasConstant / molarMass * (gamma / (gamma - 1))
+        return massFlow * cP * (T - 293.15)
+        
     def runSimulation(self, callback=None) -> SimulationResult:
         """Runs a simulation of the motor and returns a simRes instance with the results. Constraints are checked,
         including the number of grains, if the motor has a propellant set, and if the grains have geometry errors. If
@@ -275,6 +281,9 @@ class Motor:
         simRes.channels["exitPressure"].addData(0)
         simRes.channels["dThroat"].addData(0)
         simRes.channels["machNumber"].addData([0 for grain in self.grains])
+        simRes.channels["exitVelocity"].addData(0)
+        simRes.channels["exitMachNumber"].addData(0)
+        simRes.channels["heatFlow"].addData(0)
 
         # Check port/throat ratio and add a warning if it is not large enough
         aftPort = self.grains[-1].getPortArea(0)
@@ -368,6 +377,44 @@ class Motor:
 
             simRes.channels["time"].addData(simRes.channels["time"].getLast() + dTime)
 
+            # Calculate Exit Mach Number
+            chamberPres = simRes.channels["pressure"].getLast()
+            ambPres = self.config.getProperty("ambPressure")
+            pressureRatio = chamberPres / ambPres
+            # p0/pb for a sonic throat: ((gamma+1)/2)^(gamma/(gamma-1))
+            criticalPressureRatio = ((gamma + 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+            if pressureRatio >= criticalPressureRatio:
+                throatReachedSonic = True
+            exitMachNumber = self.nozzle.calcExitMachNumber(
+                simRes.channels["pressure"].getLast(),
+                simRes.channels["exitPressure"].getLast(),
+                gamma
+            )
+            simRes.channels["exitMachNumber"].addData(exitMachNumber)
+            
+            # Calculate Exit Velocity
+            currentTotalMassFlow = simRes.channels["massFlow"].getLast()[-1]
+            velocity = self.nozzle.calcExitVelocity(
+                simRes.channels["force"].getLast(),
+                self.config.getProperty("ambPressure"),
+                simRes.channels["exitPressure"].getLast(),
+                currentTotalMassFlow
+            )
+            simRes.channels["exitVelocity"].addData(velocity)
+
+            # Calculate Heat Flow
+            _, _, _, T, molarMass = self.propellant.getCombustionProperties(pressure)
+            heatFlow = self.calcHeatFlow(
+                currentTotalMassFlow,
+                molarMass,
+                gasConstant,
+                gamma,
+                T
+            )
+            simRes.channels["heatFlow"].addData(heatFlow)
+
+            
+
             # Calculate any slag deposition or erosion of the throat
             if pressure == 0:
                 slagRate = 0
@@ -425,6 +472,11 @@ class Motor:
             * self.config.getProperty("sepPressureRatio"),
         ) > self.config.getProperty("flowSeparationWarnPercent"):
             desc = "Low exit pressure, nozzle flow may separate"
+            alert = SimAlert(SimAlertLevel.WARNING, SimAlertType.VALUE, desc, "Nozzle")
+            simRes.addAlert(alert)
+
+        if simRes.channels["time"].getLast() > 0 and not throatReachedSonic:
+            desc = "Chamber pressure never reached the critical ratio; throat flow stayed subsonic"
             alert = SimAlert(SimAlertLevel.WARNING, SimAlertType.VALUE, desc, "Nozzle")
             simRes.addAlert(alert)
 

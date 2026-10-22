@@ -22,7 +22,7 @@ class ResultsWidget(QWidget):
         self.simResult = None
         self.cachedChecks = None
 
-        excludes = ['kn', 'pressure', 'force', 'mass', 'massFlow', 'massFlux', 'exitPressure', 'dThroat', 'volumeLoading', 'machNumber']
+        excludes = ['kn', 'pressure', 'force', 'mass', 'massFlow', 'massFlux', 'exitPressure', 'dThroat', 'volumeLoading', 'machNumber', 'exitVelocity', 'exitMachNumber', 'heatFlow']
         self.ui.channelSelectorX.setupChecks(False, default='time', exclude=excludes)
         self.ui.channelSelectorX.setTitle('X Axis')
         self.ui.channelSelectorY.setupChecks(True, default=['kn', 'pressure', 'force'], exclude=['time'])

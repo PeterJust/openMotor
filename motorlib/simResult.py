@@ -117,6 +117,9 @@ singleValueChannels = [
     "volumeLoading",
     "exitPressure",
     "dThroat",
+    "exitVelocity",
+    "exitMachNumber",
+    "heatFlow"
 ]
 multiValueChannels = ["mass", "massFlow", "massFlux", "regression", "web", "machNumber"]
 
@@ -144,6 +147,9 @@ class SimulationResult:
             "regression": LogChannel("Regression Depth", tuple, "m"),
             "web": LogChannel("Web", tuple, "m"),
             "exitPressure": LogChannel("Nozzle Exit Pressure", float, "Pa"),
+            "exitVelocity": LogChannel("Nozzle Exit Velocity", float, "m/s"),
+            "exitMachNumber": LogChannel("Nozzle Exit Mach Number", float, ""),
+            "heatFlow": LogChannel("Heat Flow", float, "W"),
             "dThroat": LogChannel("Change in Throat Diameter", float, "m"),
             "machNumber": LogChannel("Core Mach Number", tuple, ""),
         }
@@ -202,6 +208,18 @@ class SimulationResult:
     def getAverageForce(self):
         """Returns the average force the motor produced during its burn."""
         return self.channels["force"].getAverage()
+
+    def getPeakForce(self):
+        """Returns the peak force the motor produced during its burn."""
+        return self.channels["force"].getMax()
+    
+    def getPeakExitVelocity(self):
+        """Returns the peak exit velocity the motor produced during its burn."""
+        return self.channels["exitVelocity"].getMax()
+    
+    def getPeakExitMachNumber(self):
+        """Returns the peak exit Mach number the motor produced during its burn."""
+        return self.channels["exitMachNumber"].getMax()
 
     def getDesignation(self):
         """Returns the standard amateur rocketry designation (H128, M1297) for the motor."""
