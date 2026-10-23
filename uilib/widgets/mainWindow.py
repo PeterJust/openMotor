@@ -28,7 +28,7 @@ class Window(QMainWindow):
         self.motorStatLabels = [self.ui.labelMotorDesignation, self.ui.labelImpulse, self.ui.labelDeliveredISP, self.ui.labelBurnTime,  self.ui.labelVolumeLoading,
                                 self.ui.labelAveragePressure, self.ui.labelPeakPressure, self.ui.labelInitialKN, self.ui.labelPeakKN, self.ui.labelIdealThrustCoefficient,
                                 self.ui.labelPropellantMass, self.ui.labelPropellantDimensions, self.ui.labelPortThroatRatio, self.ui.labelPeakMassFlux, self.ui.labelDeliveredThrustCoefficient,
-                                self.ui.labelPeakThrust, self.ui.labelPeakExitVelocity, self.ui.labelPeakExitMachNumber
+                                self.ui.labelPeakThrust, self.ui.labelPeakExitVelocity, self.ui.labelExitMachNumber
                                ]
 
         self.app.fileManager.fileNameChanged.connect(self.updateWindowTitle)
@@ -327,7 +327,7 @@ class Window(QMainWindow):
             self.ui.labelPortThroatRatio.setText('-')
             self.ui.labelPeakMassFlux.setText('-')
         self.ui.labelDeliveredThrustCoefficient.setText(self.formatMotorStat(simResult.getAdjustedThrustCoefficient(), ''))
-        self.ui.labelPeakExitMachNumber.setText(self.formatMotorStat(simResult.getPeakExitMachNumber(), ''))
+        self.ui.labelExitMachNumber.setText(self.formatMotorStat(simResult.getExitMachNumber(), ''))
 
     def getQuickResults(self, motor):
         thread = lambda: self.showQuickResults(motor.getQuickResults())

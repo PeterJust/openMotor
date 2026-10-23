@@ -595,14 +595,14 @@
          <item row="5" column="2">
           <layout class="QHBoxLayout" name="horizontalLayoutPeakMachNumber">
            <item>
-            <widget class="QLabel" name="labelPeakExitMachNumberText">
+            <widget class="QLabel" name="labelExitMachNumberText">
              <property name="text">
-              <string>Peak Mach Number:</string>
+              <string>Exit Mach Number:</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QLabel" name="labelPeakExitMachNumber">
+            <widget class="QLabel" name="labelExitMachNumber">
              <property name="text">
               <string>-</string>
              </property>

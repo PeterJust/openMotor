@@ -377,21 +377,6 @@ class Motor:
 
             simRes.channels["time"].addData(simRes.channels["time"].getLast() + dTime)
 
-            # Calculate Exit Mach Number
-            chamberPres = simRes.channels["pressure"].getLast()
-            ambPres = self.config.getProperty("ambPressure")
-            pressureRatio = chamberPres / ambPres
-            # p0/pb for a sonic throat: ((gamma+1)/2)^(gamma/(gamma-1))
-            criticalPressureRatio = ((gamma + 1.0) / 2.0) ** (gamma / (gamma - 1.0))
-            if pressureRatio >= criticalPressureRatio:
-                throatReachedSonic = True
-            exitMachNumber = self.nozzle.calcExitMachNumber(
-                simRes.channels["pressure"].getLast(),
-                simRes.channels["exitPressure"].getLast(),
-                gamma
-            )
-            simRes.channels["exitMachNumber"].addData(exitMachNumber)
-            
             # Calculate Exit Velocity
             currentTotalMassFlow = simRes.channels["massFlow"].getLast()[-1]
             velocity = self.nozzle.calcExitVelocity(
@@ -412,6 +397,28 @@ class Motor:
                 T
             )
             simRes.channels["heatFlow"].addData(heatFlow)
+
+            # Calculate Exit Mach Number
+            chamberPres = simRes.channels["pressure"].getLast()
+            ambPres = self.config.getProperty("ambPressure")
+            pressureRatio = chamberPres / ambPres
+            # p0/pb for a sonic throat: ((gamma+1)/2)^(gamma/(gamma-1))
+            criticalPressureRatio = ((gamma + 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+            if pressureRatio >= criticalPressureRatio:
+                throatReachedSonic = True
+            # exitMachNumber = self.nozzle.calcExitMachNumber(
+            #     simRes.channels["pressure"].getLast(),
+            #     simRes.channels["exitPressure"].getLast(),
+            #     gamma
+            # )
+            exitMachNumber = self.nozzle.calcNonIdealExitMachNumber(
+                simRes.channels["exitVelocity"].getLast(),
+                T,
+                gasConstant,
+                molarMass,
+                gamma
+            )
+            simRes.channels["exitMachNumber"].addData(exitMachNumber)
 
             
 

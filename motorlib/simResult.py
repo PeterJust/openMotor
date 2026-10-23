@@ -217,7 +217,7 @@ class SimulationResult:
         """Returns the peak exit velocity the motor produced during its burn."""
         return self.channels["exitVelocity"].getMax()
     
-    def getPeakExitMachNumber(self):
+    def getExitMachNumber(self):
         """Returns the peak exit Mach number the motor produced during its burn."""
         return self.channels["exitMachNumber"].getMax()
 
