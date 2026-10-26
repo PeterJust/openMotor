@@ -221,6 +221,10 @@ class SimulationResult:
         """Returns the peak exit Mach number the motor produced during its burn."""
         return self.channels["exitMachNumber"].getMax()
 
+    def getPeakHeatFlow(self):
+        """Returns the peak heat flow (in kW) the motor produced during its burn."""
+        return self.channels["heatFlow"].getMax()
+
     def getDesignation(self):
         """Returns the standard amateur rocketry designation (H128, M1297) for the motor."""
         imp = self.getImpulse()

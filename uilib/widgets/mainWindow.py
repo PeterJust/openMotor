@@ -25,10 +25,10 @@ class Window(QMainWindow):
 
         self.app.propellantManager.updated.connect(self.propListChanged)
 
-        self.motorStatLabels = [self.ui.labelMotorDesignation, self.ui.labelImpulse, self.ui.labelDeliveredISP, self.ui.labelBurnTime,  self.ui.labelVolumeLoading,
-                                self.ui.labelAveragePressure, self.ui.labelPeakPressure, self.ui.labelInitialKN, self.ui.labelPeakKN, self.ui.labelIdealThrustCoefficient,
-                                self.ui.labelPropellantMass, self.ui.labelPropellantDimensions, self.ui.labelPortThroatRatio, self.ui.labelPeakMassFlux, self.ui.labelDeliveredThrustCoefficient,
-                                self.ui.labelPeakThrust, self.ui.labelPeakExitVelocity, self.ui.labelExitMachNumber
+        # Ordered like the statistics panel: one line per column, top to bottom
+        self.motorStatLabels = [self.ui.labelMotorDesignation, self.ui.labelPeakThrust, self.ui.labelDeliveredThrustCoefficient, self.ui.labelDeliveredISP, self.ui.labelBurnTime, self.ui.labelImpulse,
+                                self.ui.labelPeakExitVelocity, self.ui.labelExitMachNumber, self.ui.labelPortThroatRatio, self.ui.labelPeakHeatFlow, self.ui.labelInitialKN, self.ui.labelPeakKN,
+                                self.ui.labelAveragePressure, self.ui.labelPeakPressure, self.ui.labelPropellantMass, self.ui.labelPropellantDimensions, self.ui.labelVolumeLoading, self.ui.labelPeakMassFlux
                                ]
 
         self.app.fileManager.fileNameChanged.connect(self.updateWindowTitle)
@@ -295,39 +295,43 @@ class Window(QMainWindow):
         return '{:.2f} {}'.format(motorlib.units.convert(quantity, inUnit, convUnit), convUnit)
 
     def updateMotorStats(self, simResult):
+        # Column 1
         self.ui.labelMotorDesignation.setText('{} ({:.0%})'.format(simResult.getDesignation(), simResult.getImpulseClassPercentage()))
-        self.ui.labelImpulse.setText(self.formatMotorStat(simResult.getImpulse(), 'Ns'))
+        self.ui.labelPeakThrust.setText(self.formatMotorStat(simResult.getPeakForce(), 'N'))
+        self.ui.labelDeliveredThrustCoefficient.setText(self.formatMotorStat(simResult.getAdjustedThrustCoefficient(), ''))
         self.ui.labelDeliveredISP.setText(self.formatMotorStat(simResult.getISP(), 's'))
         self.ui.labelBurnTime.setText(self.formatMotorStat(simResult.getBurnTime(), 's'))
-        self.ui.labelVolumeLoading.setText('{:.2f}%'.format(simResult.getVolumeLoading()))
-        self.ui.labelPeakThrust.setText(self.formatMotorStat(simResult.getPeakForce(), 'N'))
+        self.ui.labelImpulse.setText(self.formatMotorStat(simResult.getImpulse(), 'Ns'))
 
-        self.ui.labelAveragePressure.setText(self.formatMotorStat(simResult.getAveragePressure(), 'Pa'))
-        self.ui.labelPeakPressure.setText(self.formatMotorStat(simResult.getMaxPressure(), 'Pa'))
+        # Column 2
+        self.ui.labelPeakExitVelocity.setText(self.formatMotorStat(simResult.getPeakExitVelocity(), 'm/s'))
+        self.ui.labelExitMachNumber.setText(self.formatMotorStat(simResult.getExitMachNumber(), ''))
+        # The port/throat ratio only makes sense for grains with cores, so blank it out for endburners
+        if simResult.getPortRatio() is not None:
+            self.ui.labelPortThroatRatio.setText(self.formatMotorStat(simResult.getPortRatio(), ''))
+        else:
+            self.ui.labelPortThroatRatio.setText('-')
+        self.ui.labelPeakHeatFlow.setText(self.formatMotorStat(simResult.getPeakHeatFlow(), 'kW'))
         self.ui.labelInitialKN.setText(self.formatMotorStat(simResult.getInitialKN(), ''))
         self.ui.labelPeakKN.setText(self.formatMotorStat(simResult.getPeakKN(), ''))
-        self.ui.labelIdealThrustCoefficient.setText(self.formatMotorStat(simResult.getIdealThrustCoefficient(), ''))
-        self.ui.labelPeakExitVelocity.setText(self.formatMotorStat(simResult.getPeakExitVelocity(), 'm/s'))
 
+        # Column 3
+        self.ui.labelAveragePressure.setText(self.formatMotorStat(simResult.getAveragePressure(), 'Pa'))
+        self.ui.labelPeakPressure.setText(self.formatMotorStat(simResult.getMaxPressure(), 'Pa'))
         self.ui.labelPropellantMass.setText(self.formatMotorStat(simResult.getPropellantMass(), 'kg'))
         propellantDimensionString = '⌀ {} x {}'.format(
             self.formatMotorStat(simResult.getMaxPropellantDiameter(), 'm'),
             self.formatMotorStat(simResult.getPropellantLength(), 'm')
         )
         self.ui.labelPropellantDimensions.setText(propellantDimensionString)
-
-        # These only make sense for grains with cores, so blank them out for endburners
+        self.ui.labelVolumeLoading.setText('{:.2f}%'.format(simResult.getVolumeLoading()))
+        # The peak mass flux only makes sense for grains with cores, so blank it out for endburners
         if simResult.getPortRatio() is not None:
-            self.ui.labelPortThroatRatio.setText(self.formatMotorStat(simResult.getPortRatio(), ''))
             peakMassFluxQuantity = self.formatMotorStat(simResult.getPeakMassFlux(), 'kg/(m^2*s)')
             peakMassFluxGrain = simResult.getPeakMassFluxLocation() + 1
             self.ui.labelPeakMassFlux.setText('{} (G: {})'.format(peakMassFluxQuantity, peakMassFluxGrain))
-
         else:
-            self.ui.labelPortThroatRatio.setText('-')
             self.ui.labelPeakMassFlux.setText('-')
-        self.ui.labelDeliveredThrustCoefficient.setText(self.formatMotorStat(simResult.getAdjustedThrustCoefficient(), ''))
-        self.ui.labelExitMachNumber.setText(self.formatMotorStat(simResult.getExitMachNumber(), ''))
 
     def getQuickResults(self, motor):
         thread = lambda: self.showQuickResults(motor.getQuickResults())
@@ -336,15 +340,18 @@ class Window(QMainWindow):
         dataThread.start()
 
     def showQuickResults(self, results):
-        self.ui.labelVolumeLoading.setText('{:.2f}%'.format(results['volumeLoading']))
+        # Column 2
+        self.ui.labelPortThroatRatio.setText(self.formatMotorStat(results['portRatio'], ''))
         self.ui.labelInitialKN.setText(self.formatMotorStat(results['initialKn'], ''))
+
+        # Column 3
+        self.ui.labelPropellantMass.setText(self.formatMotorStat(results['propellantMass'], 'kg'))
         propellantDimensionString = '⌀ {} x {}'.format(
             self.formatMotorStat(results['diameter'], 'm'),
             self.formatMotorStat(results['length'], 'm')
         )
         self.ui.labelPropellantDimensions.setText(propellantDimensionString)
-        self.ui.labelPropellantMass.setText(self.formatMotorStat(results['propellantMass'], 'kg'))
-        self.ui.labelPortThroatRatio.setText(self.formatMotorStat(results['portRatio'], ''))
+        self.ui.labelVolumeLoading.setText('{:.2f}%'.format(results['volumeLoading']))
 
     def runSimulation(self):
         self.resetOutput()
