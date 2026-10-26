@@ -579,7 +579,7 @@
            <item>
             <widget class="QLabel" name="labelPeakExitVelocityText">
              <property name="text">
-              <string>Peak Exit Velocity:</string>
+              <string>Exit Velocity:</string>
              </property>
             </widget>
            </item>

@@ -377,18 +377,21 @@ class Motor:
 
             simRes.channels["time"].addData(simRes.channels["time"].getLast() + dTime)
 
-            # Calculate Exit Velocity
-            currentTotalMassFlow = simRes.channels["massFlow"].getLast()[-1]
-            velocity = self.nozzle.calcExitVelocity(
-                simRes.channels["force"].getLast(),
-                self.config.getProperty("ambPressure"),
-                simRes.channels["exitPressure"].getLast(),
-                currentTotalMassFlow
+            # Calculate Exit Velocity. This is the momentum-equivalent axial exit speed including speed-reducing losses
+            # (no divergence loss, no pressure thrust), so it is independent of under- or overexpansion.
+            _, _, _, T, molarMass = self.propellant.getCombustionProperties(pressure)
+            velocity = self.nozzle.getAdjustedExitVelocity(
+                pressure,
+                gamma,
+                T,
+                molarMass,
+                dThroat,
+                simRes.channels["exitPressure"].getLast()
             )
             simRes.channels["exitVelocity"].addData(velocity)
 
             # Calculate Heat Flow in kW
-            _, _, _, T, molarMass = self.propellant.getCombustionProperties(pressure)
+            currentTotalMassFlow = simRes.channels["massFlow"].getLast()[-1]
             heatFlow = 0.001 * self.calcHeatFlow(
                 currentTotalMassFlow,
                 molarMass,

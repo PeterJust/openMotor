@@ -6,7 +6,7 @@ from scipy.optimize import fsolve
 from .properties import FloatProperty, PropertyCollection
 from . import geometry
 from .simResult import SimAlert, SimAlertLevel, SimAlertType
-from .constants import maximumRefDiameter, maximumRefLength
+from .constants import gasConstant, maximumRefDiameter, maximumRefLength
 
 def eRatioFromPRatio(k, pRatio):
     """Returns the expansion ratio of a nozzle given the pressure ratio it causes."""
@@ -100,13 +100,35 @@ class Nozzle(PropertyCollection):
         efficiency = self.getProperty('efficiency')
         return divLoss * throatLoss * efficiency * (skinLoss * thrustCoeffIdeal + (1 - skinLoss))
 
-    def calcExitVelocity(self, thrust, ambPres, exitPres, massFlux):
-        """Calculate the exit velocity based on the thrust, accounting for thrust loss or gain due to 
-        under- or overexpanded flow."""
-        if massFlux > 0:
-            return (thrust - (exitPres - ambPres) * self.getExitArea()) / massFlux
-        else:
+    def getIdealExitVelocity(self, chamberPres, gamma, T, molarMass, exitPres=None):
+        """Calculates the ideal (isentropic) exit velocity of the nozzle, given the chamber pressure, the propellant's
+        specific heat ratio, combustion temperature and molar mass. If nozzle exit pressure isn't provided, it will be
+        calculated. This is the momentum term of the ideal thrust coefficient (C_f * c*), so it doesn't depend on the
+        ambient pressure: under- or overexpansion only changes the pressure thrust, not the exit velocity."""
+        if chamberPres == 0:
             return 0
+
+        if exitPres is None:
+            exitPres = self.getExitPressure(gamma, chamberPres)
+
+        term1 = (2 * gamma) / (gamma - 1)
+        term2 = (gasConstant / molarMass) * T
+        term3 = 1 - ((exitPres / chamberPres) ** ((gamma - 1) / gamma))
+
+        return (term1 * term2 * term3) ** 0.5
+
+    def getAdjustedExitVelocity(self, chamberPres, gamma, T, molarMass, dThroat, exitPres=None):
+        """Calculates the adjusted exit velocity of the nozzle: the momentum-equivalent (mass-averaged), axial exit
+        speed of the flow including losses. Only losses that reduce the speed of the flow are applied: throat, skin
+        friction and the catch-all efficiency (heat loss to the nozzle, incomplete combustion, ...). The divergence loss
+        is left out on purpose. It reduces the axial momentum (thrust), but the gas still leaves at full speed, and the
+        Mach number depends on the speed only. Unlike the thrust coefficient, the skin loss is a plain factor here, as
+        the (1 - skinLoss) offset is meaningless for a velocity."""
+        velocityIdeal = self.getIdealExitVelocity(chamberPres, gamma, T, molarMass, exitPres)
+        throatLoss = self.getThroatLosses(dThroat)
+        skinLoss = self.getSkinLosses()
+        efficiency = self.getProperty('efficiency')
+        return throatLoss * skinLoss * efficiency * velocityIdeal
 
     def calcExitMachNumber(self, chamberPres, exitPres, gamma):
         """Calculates the ideal Mach number at the nozzle exit given the chamber pressure, exit pressure, 
@@ -119,9 +141,13 @@ class Nozzle(PropertyCollection):
     def calcNonIdealExitMachNumber(self, velocity, T, gasConstant, molarMass, gamma):
         """Calculates the non-ideal Mach number at the nozzle exit given the exit velocity, temperature, gas constant, 
         and isentropic exponent. The (gamma -1) /2 belongs to the u**2 and converts the stagnation temperature to the 
-        local speed of sound."""
+        local speed of sound. T has to be the stagnation temperature, which stays constant in adiabatic flow with
+        friction. The result is an effective Mach number belonging to the adjusted exit velocity."""
         if velocity > 0:
-            return 1 / (gamma * gasConstant * T / molarMass / velocity**2 - ((gamma -1) / 2)) ** 0.5
+            term = gamma * gasConstant * T / molarMass / velocity**2 - ((gamma - 1) / 2)
+            if term <= 0:  # Velocity above the maximum possible one for this temperature (efficiency too high)
+                return 0
+            return 1 / term ** 0.5
         else:
             return 0
 
