@@ -149,7 +149,7 @@ class SimulationResult:
             "exitPressure": LogChannel("Nozzle Exit Pressure", float, "Pa"),
             "exitVelocity": LogChannel("Nozzle Exit Velocity", float, "m/s"),
             "exitMachNumber": LogChannel("Nozzle Exit Mach Number", float, ""),
-            "heatFlow": LogChannel("Heat Flow", float, "W"),
+            "heatFlow": LogChannel("Heat Flow", float, "kW"),
             "dThroat": LogChannel("Change in Throat Diameter", float, "m"),
             "machNumber": LogChannel("Core Mach Number", tuple, ""),
         }

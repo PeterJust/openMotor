@@ -387,9 +387,9 @@ class Motor:
             )
             simRes.channels["exitVelocity"].addData(velocity)
 
-            # Calculate Heat Flow
+            # Calculate Heat Flow in kW
             _, _, _, T, molarMass = self.propellant.getCombustionProperties(pressure)
-            heatFlow = self.calcHeatFlow(
+            heatFlow = 0.001 * self.calcHeatFlow(
                 currentTotalMassFlow,
                 molarMass,
                 gasConstant,
