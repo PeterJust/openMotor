@@ -469,7 +469,7 @@ class FmmGrain(PerforatedGrain):
                     including_contours=True,
                 )[1]
                 for contour in layerContours:
-                    contours[-1].append(geometry.clean(contour, self.mapDim, 3))
+                    contours[-1].extend(geometry.cleanSegments(contour, self.mapDim, 3))
                     contourLengths[dist] += geometry.length(contour, self.mapDim)
 
         except ValueError as exc:  # If there aren't any contours, do nothing

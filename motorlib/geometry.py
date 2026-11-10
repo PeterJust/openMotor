@@ -1,7 +1,7 @@
 """This module includes the geometry methods that openMotor uses in its calculations"""
 
 import math
-from typing import Union
+from typing import List, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -98,6 +98,34 @@ def clean(
     offset = np.array([[mapSize / 2, mapSize / 2]])
     lengths = np.linalg.norm(contour - offset, axis=1)
     return contour[lengths < (mapSize / 2) - tolerance]
+
+
+def cleanSegments(
+    contour: NDArray[Union[np.int_, np.float64]],
+    mapSize: Union[int, float],
+    tolerance: int,
+) -> List[NDArray[Union[np.int_, np.float64]]]:
+    """Like clean, but returns a list of the separate pieces of the contour that remain. Where points near the edge of
+    the circle were removed from the middle of a contour, the contour is split there instead of connecting the two
+    remaining ends with a straight line."""
+    offset = np.array([[mapSize / 2, mapSize / 2]])
+    keep = np.linalg.norm(contour - offset, axis=1) < (mapSize / 2) - tolerance
+    if not keep.any():
+        return []
+
+    # Indices where runs of kept points start and end
+    padded = np.concatenate(([False], keep, [False])).astype(int)
+    changes = np.diff(padded)
+    starts = np.flatnonzero(changes == 1)
+    ends = np.flatnonzero(changes == -1)
+    pieces = [contour[a:b] for a, b in zip(starts, ends)]
+
+    # A closed contour that is cut in the middle of its first and last run is really one piece
+    closed = np.allclose(contour[0], contour[-1])
+    if closed and len(pieces) > 1 and keep[0] and keep[-1]:
+        pieces[0] = np.concatenate((pieces[-1], pieces[0]))
+        pieces.pop()
+    return pieces
 
 
 def dist(point1: tuple[int, int], point2: tuple[int, int]) -> int:

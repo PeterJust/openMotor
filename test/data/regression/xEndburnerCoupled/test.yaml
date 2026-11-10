@@ -1,0 +1,12 @@
+motor: data/regression/xEndburnerCoupled/motor.ric
+name: X Core End Burner (Separable 3D)
+data:
+  regression:
+    - version: 0.6.2
+      stats:
+        averageThrust: 5.820
+        isp: 142.596
+        burnTime: 12.33
+        propMass: 0.05144
+      alerts:
+        - "Grains 1 and 2 were simulated with the coupled 'Separable 3D' slotted end burner model."

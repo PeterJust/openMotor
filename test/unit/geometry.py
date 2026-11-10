@@ -1,9 +1,25 @@
 import unittest
 
+import numpy as np
+
 import motorlib.geometry
 
 
 class TestGeometryMethods(unittest.TestCase):
+    def test_cleanSegmentsSplitsAtEdge(self) -> None:
+        # A contour that leaves the circle of diameter 100 in the middle and comes back must not be joined by a line
+        contour = np.array([[50.0, 20.0], [50.0, 40.0], [50.0, 99.0], [50.0, 60.0], [50.0, 70.0]])
+        pieces = motorlib.geometry.cleanSegments(contour, 100, 3)
+        self.assertEqual(len(pieces), 2)
+        self.assertEqual(len(pieces[0]), 2)
+        self.assertEqual(len(pieces[1]), 2)
+
+    def test_cleanSegmentsKeepsInnerContour(self) -> None:
+        contour = np.array([[40.0, 50.0], [50.0, 60.0], [60.0, 50.0], [50.0, 40.0], [40.0, 50.0]])
+        pieces = motorlib.geometry.cleanSegments(contour, 100, 3)
+        self.assertEqual(len(pieces), 1)
+        self.assertEqual(len(pieces[0]), 5)
+
     def test_circleArea(self) -> None:
         self.assertAlmostEqual(motorlib.geometry.circleArea(0.5), 0.19634954)
 

@@ -15,6 +15,7 @@ regression: [
   data/regression/c/test.yaml,
   data/regression/d/test.yaml,
   data/regression/x/test.yaml,
+  data/regression/xEndburnerCoupled/test.yaml,
   data/regression/rodtube/test.yaml,
   data/regression/custom/test.yaml,
   data/regression/star/test.yaml,
