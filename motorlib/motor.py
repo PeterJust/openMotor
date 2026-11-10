@@ -9,7 +9,8 @@ from .constants import atmosphericPressure, gasConstant
 from .grains import EndBurningGrain, grainTypes
 from .nozzle import Nozzle
 from .propellant import Propellant
-from .properties import FloatProperty, IntProperty, PropertyCollection
+from .properties import EnumProperty, FloatProperty, IntProperty, PropertyCollection
+from . import coupledRegression
 from .simResult import SimAlert, SimAlertLevel, SimAlertType, SimulationResult
 from .grain import Grain
 
@@ -50,6 +51,17 @@ class MotorConfig(PropertyCollection):
         self.props["mapDim"] = IntProperty("Grain Map Dimension", "", 250, 2000)
         self.props["sepPressureRatio"] = FloatProperty(
             "Separation Pressure Ratio", "", 0.001, 1
+        )
+        # Slotted end burner transition. The defaults are set here, so files and preferences that don't have these
+        # keys load with the independent grains model, which is the same as before they were added.
+        self.props["slottedEndBurnerModel"] = EnumProperty(
+            "Slotted End Burner Transition", coupledRegression.MODELS
+        )
+        self.props["transitionVoxelSize"] = FloatProperty(
+            "Transition Voxel Size", "m", 5e-5, 5e-3
+        )
+        self.props["transitionVoxelSize"].setValue(
+            coupledRegression.DEFAULT_VOXEL_SIZE
         )
 
 
@@ -100,27 +112,38 @@ class Motor:
             self.grains[-1].setProperties(entry["properties"])
         self.config.setProperties(dictionary["config"])
 
-    def calcBurningSurfaceArea(self, regDepth):
+    def buildSimulationGrains(self, quick=False):
+        """Returns a tuple of the list of grains that should be used for simulation and a list of alerts generated
+        while preparing it. This is self.grains unless one of the coupled slotted end burner models is selected and
+        the motor has an end burner followed by a slotted grain, in which case the two are replaced by proxies. In
+        either case simulationSetup has been run on the grains. The motor's own grains are never modified. 'quick'
+        builds a cheap version that is only accurate at zero regression."""
+        return coupledRegression.buildSimulationGrains(self.grains, self.config, quick)
+
+    def calcBurningSurfaceArea(self, regDepth, grains=None):
+        if grains is None:
+            grains = self.grains
         burnoutThres = self.config.getProperty("burnoutWebThres")
-        gWithReg = zip(self.grains, regDepth)
+        gWithReg = zip(grains, regDepth)
         perGrain = [
             gr.getSurfaceAreaAtRegression(reg) * int(gr.isWebLeft(reg, burnoutThres))
             for gr, reg in gWithReg
         ]
         return sum(perGrain)
 
-    def calcKN(self, regDepth, dThroat):
+    def calcKN(self, regDepth, dThroat, grains=None):
         """Returns the motor's Kn when it has each grain has regressed by its value in regDepth, which should be a list
-        with the same number of elements as there are grains in the motor."""
-        burningSurfaceArea = self.calcBurningSurfaceArea(regDepth)
+        with the same number of elements as there are grains in the motor. A list of grains to use instead of the
+        motor's can be passed in, as returned by buildSimulationGrains."""
+        burningSurfaceArea = self.calcBurningSurfaceArea(regDepth, grains)
         nozzleArea = self.nozzle.getThroatArea(dThroat)
         return burningSurfaceArea / nozzleArea
 
-    def calcIdealPressure(self, regDepth, dThroat, kn=None):
+    def calcIdealPressure(self, regDepth, dThroat, kn=None, grains=None):
         """Returns the steady-state pressure of the motor at a given reg. Kn is calculated automatically, but it can
         optionally be passed in to save time on motors where calculating surface area is expensive."""
         if kn is None:
-            kn = self.calcKN(regDepth, dThroat)
+            kn = self.calcKN(regDepth, dThroat, grains)
         return self.propellant.getPressureFromKn(kn)
 
     def calcForce(self, chamberPres, dThroat, exitPres=None):
@@ -134,11 +157,11 @@ class Motor:
         thrust = thrustCoeff * self.nozzle.getThroatArea(dThroat) * chamberPres
         return max(thrust, 0)
 
-    def calcFreeVolume(self, regDepth):
+    def calcFreeVolume(self, regDepth, grains=None):
         """Calculates the volume inside of the motor not occupied by proppellant for a set of regression depths."""
-        return sum(
-            [grain.getFreeVolume(reg) for grain, reg in zip(self.grains, regDepth)]
-        )
+        if grains is None:
+            grains = self.grains
+        return sum([grain.getFreeVolume(reg) for grain, reg in zip(grains, regDepth)])
 
     def calcTotalVolume(self):
         """Calculates the bounding-cylinder volume of the combustion chamber."""
@@ -248,36 +271,40 @@ class Motor:
         # Precalculate these are they don't change
         motorVolume = self.calcTotalVolume()
 
-        # Generate coremaps for perforated grains
-        for grain in self.grains:
-            grain.simulationSetup(self.config)
+        # Generate coremaps for perforated grains, and get the grains to simulate. These are the motor's own grains
+        # unless a coupled slotted end burner model is in use.
+        grains, setupAlerts = self.buildSimulationGrains()
+        for alert in setupAlerts:
+            simRes.addAlert(alert)
+        if len(simRes.getAlertsByLevel(SimAlertLevel.ERROR)) > 0:
+            return simRes
 
         # Setup initial values
-        perGrainReg = [0 for grain in self.grains]
+        perGrainReg = [0 for grain in grains]
 
         # At t = 0, the motor has ignited
         simRes.channels["time"].addData(0)
-        simRes.channels["kn"].addData(self.calcKN(perGrainReg, 0))
+        simRes.channels["kn"].addData(self.calcKN(perGrainReg, 0, grains))
         simRes.channels["pressure"].addData(
-            self.calcIdealPressure(perGrainReg, 0, None)
+            self.calcIdealPressure(perGrainReg, 0, None, grains)
         )
         simRes.channels["force"].addData(0)
         simRes.channels["mass"].addData(
-            [grain.getVolumeAtRegression(0) * density for grain in self.grains]
+            [grain.getVolumeAtRegression(0) * density for grain in grains]
         )
         simRes.channels["volumeLoading"].addData(
-            100 * (1 - (self.calcFreeVolume(perGrainReg) / motorVolume))
+            100 * (1 - (self.calcFreeVolume(perGrainReg, grains) / motorVolume))
         )
-        simRes.channels["massFlow"].addData([0 for grain in self.grains])
-        simRes.channels["massFlux"].addData([0 for grain in self.grains])
-        simRes.channels["regression"].addData([0 for grains in self.grains])
-        simRes.channels["web"].addData([grain.getWebLeft(0) for grain in self.grains])
+        simRes.channels["massFlow"].addData([0 for grain in grains])
+        simRes.channels["massFlux"].addData([0 for grain in grains])
+        simRes.channels["regression"].addData([0 for grain in grains])
+        simRes.channels["web"].addData([grain.getWebLeft(0) for grain in grains])
         simRes.channels["exitPressure"].addData(0)
         simRes.channels["dThroat"].addData(0)
-        simRes.channels["machNumber"].addData([0 for grain in self.grains])
+        simRes.channels["machNumber"].addData([0 for grain in grains])
 
         # Check port/throat ratio and add a warning if it is not large enough
-        aftPort = self.grains[-1].getPortArea(0)
+        aftPort = grains[-1].getPortArea(0)
         if aftPort is not None:
             minAllowed = self.config.getProperty("minPortThroat")
             ratio = aftPort / geometry.circleArea(
@@ -302,11 +329,11 @@ class Motor:
         while simRes.shouldContinueSim(burnoutThrustThres):
             # Calculate regression
             massFlow = 0
-            perGrainMass = [0 for grain in self.grains]
-            perGrainMassFlow = [0 for grain in self.grains]
-            perGrainMassFlux = [0 for grain in self.grains]
-            perGrainWeb = [0 for grain in self.grains]
-            for gid, grain in enumerate(self.grains):
+            perGrainMass = [0 for grain in grains]
+            perGrainMassFlow = [0 for grain in grains]
+            perGrainMassFlux = [0 for grain in grains]
+            perGrainWeb = [0 for grain in grains]
+            for gid, grain in enumerate(grains):
                 if grain.getWebLeft(perGrainReg[gid]) > burnoutWebThres:
                     # Calculate regression at the current pressure
                     reg = dTime * self.propellant.getBurnRate(
@@ -332,7 +359,7 @@ class Motor:
             simRes.channels["web"].addData(perGrainWeb)
 
             simRes.channels["volumeLoading"].addData(
-                100 * (1 - (self.calcFreeVolume(perGrainReg) / motorVolume))
+                100 * (1 - (self.calcFreeVolume(perGrainReg, grains) / motorVolume))
             )
             simRes.channels["mass"].addData(perGrainMass)
             simRes.channels["massFlow"].addData(perGrainMassFlow)
@@ -340,16 +367,16 @@ class Motor:
 
             # Calculate KN
             dThroat = simRes.channels["dThroat"].getLast()
-            simRes.channels["kn"].addData(self.calcKN(perGrainReg, dThroat))
+            simRes.channels["kn"].addData(self.calcKN(perGrainReg, dThroat, grains))
 
             # Calculate Pressure
             lastKn = simRes.channels["kn"].getLast()
-            pressure = self.calcIdealPressure(perGrainReg, dThroat, lastKn)
+            pressure = self.calcIdealPressure(perGrainReg, dThroat, lastKn, grains)
             simRes.channels["pressure"].addData(pressure)
 
             # Calculate Mach Number
-            perGrainMachNumber = [0 for grain in self.grains]
-            for gid, grain in enumerate(self.grains):
+            perGrainMachNumber = [0 for grain in grains]
+            for gid, grain in enumerate(grains):
                 perGrainMachNumber[gid] = self.calcMachNumber(
                     pressure, perGrainMassFlux[gid]
                 )
@@ -382,7 +409,7 @@ class Motor:
                 progress = max(
                     [
                         g.getWebLeft(r) / g.getWebLeft(0)
-                        for g, r in zip(self.grains, perGrainReg)
+                        for g, r in zip(grains, perGrainReg)
                     ]
                 )
                 if callback(
@@ -467,25 +494,27 @@ class Motor:
         if motorVolume == 0:
             return results
 
-        # Generate coremaps for perforated grains
         for grain in self.grains:
             for alert in grain.getGeometryErrors():
                 if alert.level == SimAlertLevel.ERROR:
                     return results
 
-            grain.simulationSetup(self.config)
+        # Generate coremaps for perforated grains, and get the grains to use for the calculation
+        grains, setupAlerts = self.buildSimulationGrains(quick=True)
+        if any(a.level == SimAlertLevel.ERROR for a in setupAlerts):
+            return results
 
-        perGrainReg = [0 for grain in self.grains]
+        perGrainReg = [0 for grain in grains]
 
         results["volumeLoading"] = 100 * (
-            1 - (self.calcFreeVolume(perGrainReg) / motorVolume)
+            1 - (self.calcFreeVolume(perGrainReg, grains) / motorVolume)
         )
         if throatArea != 0:
-            results["initialKn"] = self.calcKN(perGrainReg, 0)
+            results["initialKn"] = self.calcKN(perGrainReg, 0, grains)
             results["portRatio"] = simRes.getPortRatio()
         if density is not None:
             results["propellantMass"] = sum(
-                [grain.getVolumeAtRegression(0) * density for grain in self.grains]
+                [grain.getVolumeAtRegression(0) * density for grain in grains]
             )
         results["length"] = simRes.getPropellantLength()
         results["diameter"] = simRes.getMaxPropellantDiameter()

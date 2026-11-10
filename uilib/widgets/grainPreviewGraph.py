@@ -70,8 +70,8 @@ class GrainPreviewGraph(FigureCanvas):
                 self.numContours += 1
         self.draw()
 
-    def showGraph(self, points):
-        self.plot.plot(points[0], points[1], c='b')
+    def showGraph(self, points, color='b', linestyle='-'):
+        self.plot.plot(points[0], points[1], c=color, linestyle=linestyle)
         self.numContours += 1
         self.draw()
 

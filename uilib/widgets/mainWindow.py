@@ -247,10 +247,13 @@ class Window(QMainWindow):
         if len(ind) > 0:
             gid = ind[0].row()
             if gid < len(cm.grains):
+                self.ui.motorEditor.setMotorContext(cm, gid)
                 self.ui.motorEditor.loadObject(cm.grains[gid])
             elif gid == len(cm.grains):
+                self.ui.motorEditor.setMotorContext(None)
                 self.ui.motorEditor.loadObject(cm.nozzle)
             else:
+                self.ui.motorEditor.setMotorContext(None)
                 self.ui.motorEditor.loadObject(cm.config)
             self.toggleGrainButtons(False)
 
@@ -285,6 +288,7 @@ class Window(QMainWindow):
         self.app.fileManager.addNewMotorHistory(cm)
         self.updateGrainTable()
         self.ui.tableWidgetGrainList.selectRow(len(cm.grains) - 1)
+        self.ui.motorEditor.setMotorContext(cm, len(cm.grains) - 1)
         self.ui.motorEditor.loadObject(cm.grains[-1])
         self.checkGrainSelection()
         self.toggleGrainButtons(False)
